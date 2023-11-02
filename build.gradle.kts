@@ -1,5 +1,5 @@
 plugins {
-	kotlin("jvm") version "1.9.10"
+	kotlin("jvm") version "1.9.20"
 	id("java-library")
 	id("maven-publish")
 	id("nebula.release") version "17.2.2"
