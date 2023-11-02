@@ -3,11 +3,9 @@ package org.shypl.tool.app
 import ch.qos.logback.classic.ClassicConstants
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.joran.JoranConfigurator
-import ch.qos.logback.classic.util.ContextInitializer.CONFIG_FILE_PROPERTY
 import ch.qos.logback.core.util.OptionHelper
 import com.fasterxml.jackson.module.kotlin.addDeserializer
 import com.fasterxml.jackson.module.kotlin.kotlinModule
-import org.slf4j.LoggerFactory
 import org.shypl.tool.app.config.DurationDeserializer
 import org.shypl.tool.app.config.JacksonConfigLoader
 import org.shypl.tool.app.config.PropertiesConfigLoader
@@ -21,6 +19,7 @@ import org.shypl.tool.logging.info
 import org.shypl.tool.logging.ownLogger
 import org.shypl.tool.utils.MaybeStartable
 import org.shypl.tool.utils.Stoppable
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -38,7 +37,7 @@ class Application(
 	private val configEnv: String?,
 	private val configLoaders: List<ConfigLoader>,
 	modules: List<KClass<*>>,
-	injections: List<Binder.() -> Unit>
+	injections: List<Binder.() -> Unit>,
 ) : Stoppable {
 	
 	internal constructor(configuration: ApplicationConfigurationImpl) : this(
@@ -104,9 +103,11 @@ class Application(
 				var clazz: KClass<*>? = null
 			}
 			
+			val configs = HashMap<Pair<KClass<*>, String>, Any>()
+			
 			val injector = Injection()
 				.configure {
-					addSmartProducerForAnnotatedClass(::provideApplicationConfig)
+					addSmartProducerForAnnotatedClass { a: ApplicationConfig, t -> provideApplicationConfig(a, t, configs) }
 					addSmartProducerForAnnotatedParameter(::provideApplicationPath)
 					addProduceObserverBefore { actual ->
 						val expect = currentProducingModule.clazz
@@ -138,6 +139,9 @@ class Application(
 			currentProducingModule.clazz = null
 			
 			logger.info("Started")
+			
+			configs.clear()
+			
 		}
 		catch (e: Throwable) {
 			logger.error("Start fail", e)
@@ -187,8 +191,14 @@ class Application(
 		return null
 	}
 	
-	private fun provideApplicationConfig(annotation: ApplicationConfig, type: KClass<out Any>): Any {
+	private fun provideApplicationConfig(annotation: ApplicationConfig, type: KClass<out Any>, configs: MutableMap<Pair<KClass<*>, String>, Any>): Any {
 		var path = annotation.file
+		val key = Pair(type, path)
+		
+		var config = configs[key]
+		
+		if (config != null) return config
+		
 		if (path.isEmpty()) {
 			path = type.simpleName!!
 			path = if (path == "Config") {
@@ -213,7 +223,9 @@ class Application(
 				for (imaginePath in loader.imagine(path)) {
 					file = findConfigFile(imaginePath)
 					if (file != null) {
-						return loader.load(file, type)
+						config = loader.load(file, type)
+						configs[key] = config
+						return config
 					}
 				}
 			}
@@ -223,7 +235,10 @@ class Application(
 		val loader = configLoaders.find { it.match(file) }
 			?: throw RuntimeException("ApplicationConfig loader for file '$path' not found")
 		
-		return loader.load(file, type)
+		config = loader.load(file, type)
+		configs[key] = config
+		
+		return config
 	}
 	
 	private fun provideApplicationPath(annotation: ApplicationPath, parameter: KParameter): Any {
