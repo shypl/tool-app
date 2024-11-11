@@ -1,14 +1,17 @@
 package org.shypl.tool.app.holders
 
+import java.util.concurrent.locks.ReadWriteLock
+import kotlin.concurrent.withLock
+
 @Suppress("DuplicatedCode")
 open class SafePositiveLongHolder<R>(
 	value: Long,
-	private val lock: Any
+	private val lock: ReadWriteLock,
 ) {
 	@Volatile
 	private var current = value
 	
-	val value get() = current
+	val value get() = lock.readLock().withLock { current }
 	
 	protected open fun getMaximumValue() = Long.MAX_VALUE
 	
@@ -23,7 +26,7 @@ open class SafePositiveLongHolder<R>(
 		val old: Long
 		var new = value
 		
-		synchronized(lock) {
+		lock.writeLock().withLock {
 			val max = getMaximumValue()
 			if (new > max) {
 				new = max
@@ -54,7 +57,7 @@ open class SafePositiveLongHolder<R>(
 		val old: Long
 		var new: Long
 		
-		synchronized(lock) {
+		lock.writeLock().withLock {
 			old = current
 			val max = getMaximumValue()
 			if (old == max) {
@@ -88,7 +91,7 @@ open class SafePositiveLongHolder<R>(
 		val old: Long
 		val new: Long
 		
-		synchronized(lock) {
+		lock.writeLock().withLock {
 			old = current
 			if (old >= value) {
 				changed = true
