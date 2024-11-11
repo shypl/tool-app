@@ -109,3 +109,7 @@ open class SafePositiveLongHolder<R>(
 		return changed
 	}
 }
+
+fun SafePositiveLongHolder<Unit>.set(value: Long) = set(value, Unit)
+fun SafePositiveLongHolder<Unit>.add(value: Long) = add(value, Unit)
+fun SafePositiveLongHolder<Unit>.take(value: Long) = take(value, Unit)

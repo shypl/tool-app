@@ -16,7 +16,7 @@ open class SafePositiveIntHolder<R>(
 	
 	protected open fun afterChange(old: Int, new: Int, reason: R) {}
 	
-	fun set(value: Int, reason: R) {
+	fun set(value: Int, reason: R): Boolean {
 		require(value >= 0) { "Negative value" }
 		
 		val changed: Boolean
@@ -43,6 +43,8 @@ open class SafePositiveIntHolder<R>(
 		if (changed) {
 			afterChange(old, new, reason)
 		}
+		
+		return changed
 	}
 	
 	fun add(value: Int, reason: R): Int {
@@ -109,3 +111,7 @@ open class SafePositiveIntHolder<R>(
 		return changed
 	}
 }
+
+fun SafePositiveIntHolder<Unit>.set(value: Int) = set(value, Unit)
+fun SafePositiveIntHolder<Unit>.add(value: Int) = add(value, Unit)
+fun SafePositiveIntHolder<Unit>.take(value: Int) = take(value, Unit)
