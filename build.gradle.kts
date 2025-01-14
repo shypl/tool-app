@@ -1,5 +1,5 @@
 plugins {
-	kotlin("jvm") version "2.0.21"
+	kotlin("jvm") version "2.1.0"
 	id("java-library")
 	id("maven-publish")
 	id("nebula.release") version "19.0.10"
@@ -22,11 +22,11 @@ dependencies {
 	api("org.shypl.tool:tool-utils:1.0.0-SNAPSHOT")
 	api("org.shypl.tool:tool-depin:1.0.0-SNAPSHOT")
 	
-	implementation("ch.qos.logback:logback-classic:1.5.12")
+	implementation("ch.qos.logback:logback-classic:1.5.16")
 	
-	implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.1")
-	implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.1")
-	implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-properties:2.18.1")
+	implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
+	implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2")
+	implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-properties:2.18.2")
 }
 
 java {
