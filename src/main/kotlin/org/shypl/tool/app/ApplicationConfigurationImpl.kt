@@ -5,7 +5,7 @@ import kotlin.reflect.KClass
 
 internal class ApplicationConfigurationImpl(args: Array<String>) : ApplicationConfiguration {
 	override var dir: String = "."
-	override var run: String = "run/app.ru"
+	override var run: String = "run/app.run"
 	override var env: String? = null
 	
 	val modules = mutableListOf<KClass<*>>()
