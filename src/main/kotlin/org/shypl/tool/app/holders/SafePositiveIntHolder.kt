@@ -7,11 +7,11 @@ import kotlin.concurrent.withLock
 open class SafePositiveIntHolder<R>(
 	value: Int,
 	private val lock: ReadWriteLock,
-) {
+) : MutableHolder<Int, R> {
 	@Volatile
 	private var current = value
 	
-	val value get() = lock.readLock().withLock { current }
+	override val value get() = lock.readLock().withLock { current }
 	
 	protected open fun getMaximumValue() = Int.MAX_VALUE
 	
@@ -19,7 +19,7 @@ open class SafePositiveIntHolder<R>(
 	
 	protected open fun afterChange(old: Int, new: Int, reason: R) {}
 	
-	fun set(value: Int, reason: R): Boolean {
+	override fun set(value: Int, reason: R): Boolean {
 		require(value >= 0) { "Negative value" }
 		
 		val changed: Boolean
@@ -50,7 +50,7 @@ open class SafePositiveIntHolder<R>(
 		return changed
 	}
 	
-	fun add(value: Int, reason: R): Int {
+	override fun add(value: Int, reason: R): Int {
 		if (value == 0) return current
 		
 		require(value > 0) { "Negative value" }
@@ -84,7 +84,7 @@ open class SafePositiveIntHolder<R>(
 		return new
 	}
 	
-	fun take(value: Int, reason: R): Boolean {
+	override fun take(value: Int, reason: R): Boolean {
 		if (value == 0) return true
 		
 		require(value > 0) { "Negative value" }
@@ -114,7 +114,3 @@ open class SafePositiveIntHolder<R>(
 		return changed
 	}
 }
-
-fun SafePositiveIntHolder<Unit>.set(value: Int) = set(value, Unit)
-fun SafePositiveIntHolder<Unit>.add(value: Int) = add(value, Unit)
-fun SafePositiveIntHolder<Unit>.take(value: Int) = take(value, Unit)

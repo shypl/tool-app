@@ -5,7 +5,8 @@ import kotlin.reflect.KClass
 
 interface ApplicationConfiguration {
 	var dir: String
-	var configEnv: String?
+	var run: String
+	var env: String?
 	
 	fun injection(configuration: Binder.() -> Unit)
 	

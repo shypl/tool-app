@@ -7,6 +7,7 @@ import ch.qos.logback.core.util.OptionHelper
 import com.fasterxml.jackson.module.kotlin.addDeserializer
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import org.shypl.tool.app.config.DurationDeserializer
+import org.shypl.tool.app.config.FileConfigLoader
 import org.shypl.tool.app.config.JacksonConfigLoader
 import org.shypl.tool.app.config.PropertiesConfigLoader
 import org.shypl.tool.app.config.TimeStringToSecondsIntDeserializationProblemHandler
@@ -32,17 +33,19 @@ import kotlin.reflect.KParameter
 import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.jvm.jvmErasure
 
-class Application(
+class Application private constructor(
 	private val dir: Path,
-	private val configEnv: String?,
+	private val run: String,
+	private val env: String?,
 	private val configLoaders: List<ConfigLoader>,
 	modules: List<KClass<*>>,
 	injections: List<Binder.() -> Unit>,
 ) : Stoppable {
 	
-	internal constructor(configuration: ApplicationConfigurationImpl) : this(
+	private constructor(configuration: ApplicationConfigurationImpl) : this(
 		Paths.get(configuration.dir).toAbsolutePath().normalize(),
-		configuration.configEnv,
+		configuration.run,
+		configuration.env,
 		configuration.configLoaders,
 		configuration.modules,
 		configuration.injections
@@ -55,7 +58,8 @@ class Application(
 				
 				configLoaders(
 					YamlConfigLoader(),
-					PropertiesConfigLoader()
+					PropertiesConfigLoader(),
+					FileConfigLoader()
 				)
 				
 				val module = kotlinModule()
@@ -103,11 +107,12 @@ class Application(
 				var clazz: KClass<*>? = null
 			}
 			
-			val configs = HashMap<Pair<KClass<*>, String>, Any>()
+			val configs = HashMap<Pair<String, KClass<*>>, Any>()
 			
 			val injector = Injection()
 				.configure {
 					addSmartProducerForAnnotatedClass { a: ApplicationConfig, t -> provideApplicationConfig(a, t, configs) }
+					addSmartProducerForAnnotatedParameter { a: ApplicationConfig, p -> provideApplicationConfig(a, p, configs) }
 					addSmartProducerForAnnotatedParameter(::provideApplicationPath)
 					addProduceObserverBefore { actual ->
 						val expect = currentProducingModule.clazz
@@ -138,6 +143,8 @@ class Application(
 			}
 			currentProducingModule.clazz = null
 			
+			resolvePath(run).toFile().createNewFile()
+			
 			logger.info("Started")
 			
 			configs.clear()
@@ -152,6 +159,11 @@ class Application(
 	override fun stop() {
 		if (running.compareAndSet(true, false)) {
 			logger.info("Stopping")
+			
+			try {
+				resolvePath(run).toFile().delete()
+			}
+			catch (_: Throwable) {}
 			
 			for (stopper in moduleStoppers) {
 				logger.info { "Stop module ${stopper.first}" }
@@ -172,8 +184,8 @@ class Application(
 	}
 	
 	private fun resolveConfigFile(path: String): File {
-		if (configEnv != null && path.contains('.')) {
-			val envPath = "${path.substringBeforeLast('.')}.$configEnv.${path.substringAfterLast('.')}"
+		if (env != null && path.contains('.')) {
+			val envPath = "${path.substringBeforeLast('.')}.$env.${path.substringAfterLast('.')}"
 			resolvePath("config/$envPath").takeIf { Files.exists(it) }?.also {
 				return it.toFile()
 			}
@@ -191,9 +203,9 @@ class Application(
 		return null
 	}
 	
-	private fun provideApplicationConfig(annotation: ApplicationConfig, type: KClass<out Any>, configs: MutableMap<Pair<KClass<*>, String>, Any>): Any {
-		var path = annotation.file
-		val key = Pair(type, path)
+	private fun provideApplicationConfig(annotation: ApplicationConfig, type: KClass<out Any>, configs: MutableMap<Pair<String, KClass<*>>, Any>): Any {
+		var path = annotation.path
+		val key = Pair(path, type)
 		
 		var config = configs[key]
 		
@@ -232,13 +244,17 @@ class Application(
 			throw IllegalArgumentException("ApplicationConfig file '$path' not found")
 		}
 		
-		val loader = configLoaders.find { it.match(file) }
+		val loader = configLoaders.find { it.match(file, type) }
 			?: throw RuntimeException("ApplicationConfig loader for file '$path' not found")
 		
 		config = loader.load(file, type)
 		configs[key] = config
 		
 		return config
+	}
+	
+	private fun provideApplicationConfig(annotation: ApplicationConfig, parameter: KParameter, configs: MutableMap<Pair<String, KClass<*>>, Any>): Any {
+		return provideApplicationConfig(annotation, parameter.type.jvmErasure, configs)
 	}
 	
 	private fun provideApplicationPath(annotation: ApplicationPath, parameter: KParameter): Any {

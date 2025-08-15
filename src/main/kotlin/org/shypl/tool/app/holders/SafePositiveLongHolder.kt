@@ -7,11 +7,11 @@ import kotlin.concurrent.withLock
 open class SafePositiveLongHolder<R>(
 	value: Long,
 	private val lock: ReadWriteLock,
-) {
+) : MutableHolder<Long, R> {
 	@Volatile
 	private var current = value
 	
-	val value get() = lock.readLock().withLock { current }
+	override val value get() = lock.readLock().withLock { current }
 	
 	protected open fun getMaximumValue() = Long.MAX_VALUE
 	
@@ -19,7 +19,7 @@ open class SafePositiveLongHolder<R>(
 	
 	protected open fun afterChange(old: Long, new: Long, reason: R) {}
 	
-	fun set(value: Long, reason: R) {
+	override fun set(value: Long, reason: R): Boolean {
 		require(value >= 0) { "Negative value" }
 		
 		val changed: Boolean
@@ -46,9 +46,11 @@ open class SafePositiveLongHolder<R>(
 		if (changed) {
 			afterChange(old, new, reason)
 		}
+		
+		return changed
 	}
 	
-	fun add(value: Long, reason: R): Long {
+	override fun add(value: Long, reason: R): Long {
 		if (value == 0L) return current
 		
 		require(value > 0) { "Negative value" }
@@ -82,7 +84,7 @@ open class SafePositiveLongHolder<R>(
 		return new
 	}
 	
-	fun take(value: Long, reason: R): Boolean {
+	override fun take(value: Long, reason: R): Boolean {
 		if (value == 0L) return true
 		
 		require(value > 0) { "Negative value" }
@@ -112,7 +114,3 @@ open class SafePositiveLongHolder<R>(
 		return changed
 	}
 }
-
-fun SafePositiveLongHolder<Unit>.set(value: Long) = set(value, Unit)
-fun SafePositiveLongHolder<Unit>.add(value: Long) = add(value, Unit)
-fun SafePositiveLongHolder<Unit>.take(value: Long) = take(value, Unit)
